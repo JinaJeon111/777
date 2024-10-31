@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title></title>
+
+  <style>
+
+    @font-face {
+        font-family: 'ghanachoco';
+        src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_20-04@1.0/ghanachoco.woff') format('woff');
+        font-weight: normal;
+        font-style: normal;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    .blink {
+      animation: blink 2s infinite;  /* 1초마다 깜빡임 반복 */
+    }
+
+    @keyframes blinkHeart {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    .blinkHeart {
+      animation: blink 1s infinite;  /* 1초마다 깜빡임 반복 */
+    }
+
+    @keyframes drop {
+      0% {
+        top: -200px;
+      }
+      100% {
+        top: 200px;
+      }
+    }
+
+    #message:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    @keyframes bounce {
+        0%, 20%, 50%, 80%, 100% {
+            transform: translateY(0);
+        }
+        40% {
+            transform: translateY(-5px); /* 위로 떠오르는 효과 */
+        }
+        60% {
+            transform: translateY(-3px); /* 살짝 위로 떠오르는 효과 */
+        }
+    }
+
+     .score-message {
+      position: absolute;
+      font-size: 10vw;  /* 원하는 크기로 설정 */
+      font-weight: bold;
+      color: yellow;
+      opacity: 1;
+      transform: translateY(0);
+      animation: rise 2.5s forwards;
+    }
+
+    @keyframes rise {
+      0% {
+        transform: translateY(20px);
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(-30px);
+        opacity: 0;
+      }
+    }
+
+
+
+    body {
+      background-color: #f5f5f5;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      background: url('background.jpg');
+    }
+
+    .hearts {
+          position: absolute;
+          top: 5vw;
+          left: 1vw;
+          font-size: 2vw; /* 하트 크기 조절 */
+        }
+
+
+
+    /* 배경 데이터 스타일 */
+    .rank-list {
+      position: absolute;
+      top: 13vw;
+      left: 0;
+      right: 0;  /* 가로로 꽉 채우기 */
+      text-align: center;
+      line-height: 1.1;
+      color: #d3d2d2;
+      z-index: -1;
+    }
+
+    .rank-list span {
+      display: block;
+      font-weight: bold;
+      margin: 0;
+      width: 100%;  /* 가로로 완전히 채움 */
+      white-space: nowrap;  /* 줄바꿈 방지 */
+      overflow: hidden;  /* 텍스트 오버플로우 방지 */
+      letter-spacing: -0.05em;  /* 글자 간격 조절 */
+    }
+
+    .cup {
+      width: 24vw;
+      height: 24vw;
+      background-size: cover;
+      background-image: url('cup.png');
+      cursor: pointer;
+      z-index: 2;
+    }
+
+    .cat{
+      position: absolute;
+      z-index: 1;
+      width: 20vw;
+      top: 29vw;
+      left: 40vw;
+    }
+
+  </style>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, setDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyB-CaDN6Twfj0ILzRWMOOban2QDUP20caY",
+      authDomain: "webinter-8a7d8.firebaseapp.com",
+      projectId: "webinter-8a7d8",
+      storageBucket: "webinter-8a7d8.appspot.com",
+      messagingSenderId: "643213532508",
+      appId: "1:643213532508:web:82f136ed9c7ebdc7bbf599"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let nickname = "";
+
+    // 닉네임 입력 받기
+    async function getNickname() {
+      nickname = prompt("닉네임을 입력하세요:");
+      if (!nickname) {
+        alert("닉네임을 입력해야 합니다.");
+        return getNickname();
+      }
+
+      const docRef = doc(db, "players", nickname);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        alert("이미 사용된 닉네임입니다. 다른 닉네임을 입력하세요.");
+        return getNickname();  // 중복된 닉네임일 경우 다시 입력받기
+      }
+
+
+      if (!docSnap.exists()) {
+        // 새로운 사용자라면 초기 점수 0으로 저장
+        await setDoc(docRef, { score: 0 });
+      }
+
+      displayRankings();  // 닉네임 입력 후 배경 순위 표시
+    }
+
+
+    const images = ["cat-kitty.gif", "cat.gif", "cat2.gif", "degraafschapdierenartsen-de-graafschap-dierenartsen.gif"]; // 이미지 파일 배열
+    const imageElement = document.getElementById("lying");
+
+    // 이미지 비율 유지하면서 최대 크기 설정
+    imageElement.style.width = "100%";        // 가득 차게
+    imageElement.style.height = "100%";       // 가득 차게
+    imageElement.style.maxWidth = "18vw";     // 최대 너비 설정
+    imageElement.style.maxHeight = "18vw";    // 최대 높이 설정
+    imageElement.style.objectFit = "contain"; // 비율 유지하며 가득 차게
+
+    function setRandomImage() {
+      imageElement.style.display = "block";
+      const randomIndex = Math.floor(Math.random() * images.length);
+      imageElement.src = images[randomIndex];
+    }
+
+    setRandomImage();
+
+
+    const cups = document.querySelectorAll(".cup");
+      const cats = document.querySelectorAll(".cat");
+
+      // 초기 위치 설정
+      const initialPositions = [
+        { x: 14, y: 23 }, // 첫 번째 컵 위치
+        { x: 37, y: 23 }, // 두 번째 컵 위치
+        { x: 60, y: 23 }  // 세 번째 컵 위치
+      ];
+
+      function dropCups() {
+        cups.forEach((cup, index) => {
+            const { x, y } = initialPositions[index];
+
+            // 초기 위치를 화면 위로 설정
+            cup.style.left = `${x}vw`;
+            cup.style.top = `${y - 20}vw`; // 시작 위치를 더 위로 설정
+            cup.style.display = "block";
+            cup.style.position = "absolute";
+            
+            setTimeout(() => {
+                // 최종 위치로 이동 애니메이션
+                cup.style.transition = "top 0.5s ease, left 0.5s ease"; // 이동 애니메이션
+                cup.style.top = `${y}vw`; // 최종 위치로 이동
+                cup.dataset.dropped = "true"; // 컵이 떨어졌음을 표시
+            }, index * 400); // 0.3초 간격으로 배치
+        });
+
+          cats.forEach(cat => {
+              cat.style.transition = "opacity 2s ease"; // 서서히 투명해지도록 설정
+              cat.style.opacity = "0"; // 투명하게 만듦
+
+              setTimeout(() => {
+                  cat.style.display = "none"; // 1초 후에 완전히 제거
+              }, 2000); // 1초 후에 'none'으로 설정
+          });
+
+      }
+
+        function shuffleCups() {
+          const positions = [...initialPositions]; // 기존 위치 복사
+
+          // 컵 교환 함수
+          function swapCups(cup1, cup2) {
+            const tempX = cup1.style.left;
+            const tempY = cup1.style.top;
+
+            cup1.style.left = cup2.style.left;
+            cup1.style.top = cup2.style.top;
+
+            cup2.style.left = tempX;
+            cup2.style.top = tempY;
+
+            swoosh.play();
+          }
+
+          let shuffleCount = 0;
+          const shuffleInterval = setInterval(() => {
+            // 무작위로 두 개의 컵 선택
+            const cup1Index = Math.floor(Math.random() * cups.length);
+            let cup2Index = Math.floor(Math.random() * cups.length);
+
+            // 서로 다른 컵을 선택하도록 조정
+            while (cup2Index === cup1Index) {
+              cup2Index = Math.floor(Math.random() * cups.length);
+            }
+
+            swapCups(cups[cup1Index], cups[cup2Index]); // 선택한 컵 교환
+
+            shuffleCount++;
+
+            if (shuffleCount === 10) { // 10번 섞은 후 정지
+              clearInterval(shuffleInterval);
+            }
+          }, shuffleSpeed); // 0.8초마다 섞기 반복
+        }
+
+
+
+
+    document.getElementById("message").addEventListener("click", () => {
+
+      button.play();
+      setTimeout(dropCups, 1500); // 컵 떨어뜨리기
+      // 모든 컵이 떨어진 후 섞기 시작
+      setTimeout(shuffleCups, 3500);
+    });
+
+
+
+
+    let lives = 3; // 초기 목숨 개수
+    let correctCup = 1; // 고양이가 있는 컵 (0부터 시작하므로 1)
+    // 랜덤 고양이 이미지 배열
+    const catImages = [
+      "cat-in-shock-surprises.gif",
+      "chulei-pinch.gif",
+      "surprised.png",
+      "happycat.gif",
+      "maxwellcat.gif"
+      // 다른 고양이 이미지 파일 경로를 추가하세요
+    ];
+    let level = 1; // 초기 레벨
+    let shuffleSpeed = 500; // 초기 섞기 속도 (밀리초)
+    const levelDisplay = document.getElementById("levelDisplay");
+
+    function updateLevel() {
+        level++;
+        shuffleSpeed = Math.max(100, shuffleSpeed - 50); // 섞는 속도 점점 빠르게, 최소 300ms
+        levelDisplay.textContent = `Level ${level}`; // 화면에 레벨 업데이트
+        levelDisplay.classList.add("blinkHeart");
+        // 2초 후에 깜빡임 효과 제거
+        setTimeout(() => {
+            levelDisplay.classList.remove("blinkHeart"); // 깜빡임 클래스 제거
+        }, 2000);
+    }
+
+    // 야바위 게임 진행
+    function startGame() {
+      const cups = document.querySelectorAll(".cup");
+      
+      const messageButton = document.querySelector("#message"); 
+      const heartsContainer = document.querySelector(".hearts"); // 하트 요소 선택
+
+      cups.forEach((cup, index) => {
+        cup.onclick = async () => {
+          // 컵을 위로 이동
+          cup.style.transition = "transform 0.5s"; // 애니메이션 속도 조정
+          cup.style.transform = "translateY(-20vw)"; // 위로 이동
+
+          setTimeout(() => {
+            // 애니메이션 후 컵 원래 위치로 돌아가기
+            cup.style.transform = "translateY(0)";
+          }, 2000); // 0.5초 후 원래 위치로
+
+          let scoreChange = index === correctCup ? 10 : -5;  // 정답: +10점, 오답: -5점
+          await updateScore(scoreChange);
+
+          // 성공 또는 실패 문구 업데이트
+          const isCorrect = index === correctCup; // 정답 여부 확인
+          const messageText = isCorrect ? "+10" : "-5";
+          const messageElement = document.createElement("div");
+          messageElement.className = "score-message";
+          messageElement.textContent = messageText;
+
+          // 메시지 색상 설정
+          messageElement.style.color = isCorrect ? "yellow" : "#0061ff"; // 정답은 노랑, 오답은 파랑
+
+          // 컵의 위치에 메시지를 표시
+          messageElement.style.top = `${parseFloat(cup.style.top) - 20}vw`; // 컵 위에 위치
+          messageElement.style.right = `${5}vw`; // 중앙 정렬
+
+          document.body.appendChild(messageElement); // 메시지 추가
+
+          // 메시지가 화면에 표시된 후 2초 후에 제거
+          setTimeout(() => {
+            document.body.removeChild(messageElement);
+          }, 2500);
+
+          if (isCorrect) {
+            messageButton.textContent = "찾았다 요놈!";
+            setTimeout(() => {
+              messageButton.textContent = "다음 레벨 도전!";
+            }, 3000);
+            updateLevel(); // 성공 시 레벨 증가
+            
+            messageButton.style.color = "black";
+            messageButton.style.backgroundColor = "yellow";
+
+            // 정답일 때 랜덤 고양이 이미지 보여주기
+            const randomCatImage = catImages[Math.floor(Math.random() * catImages.length)];
+            const catImageElement = document.createElement("img");
+            catImageElement.src = randomCatImage;
+            catImageElement.style.position = "absolute";
+            catImageElement.style.top = `${parseFloat(cup.style.top) + 6}vw`; // 컵 아래에 위치
+            catImageElement.style.left = cup.style.left; // 컵과 같은 위치
+            catImageElement.style.transform = "translate(4vw, 0)"; // 중앙 정렬
+            // 이미지 비율 유지하면서 최대 크기 설정
+            catImageElement.style.width = "100%";        // 가득 차게
+            catImageElement.style.height = "100%";       // 가득 차게
+            catImageElement.style.maxWidth = "18vw";     // 최대 너비 설정
+            catImageElement.style.maxHeight = "18vw";    // 최대 높이 설정
+            catImageElement.style.objectFit = "contain";  // 비율 유지하며 가득 차게
+
+            document.body.appendChild(catImageElement); // 이미지 추가
+            // 2초 후에 고양이 이미지 제거
+            setTimeout(() => {
+              document.body.removeChild(catImageElement);
+            }, 2000);
+
+            // 정답을 맞췄을 때 correctCup 업데이트
+            correctCup = index; // 선택된 컵 인덱스를 correctCup으로 설정
+            console.log(correctCup);
+
+            const meowSounds = [
+              "meow1.mp3",
+              "meow2.mp3",
+              "meow3.mp3",
+              "meow4.mp3",
+              "meow5.mp3",
+              "meow6.mp3"
+            ];
+            const randomIndex = Math.floor(Math.random() * meowSounds.length);
+            const audio = new Audio(meowSounds[randomIndex]); // 랜덤 사운드 선택
+            audio.play(); // 사운드 재생
+
+          } else {
+            messageButton.textContent = "어디 갔지..";
+            messageButton.style.color = "white";
+            messageButton.style.backgroundColor = "#2465d3";
+            lives--; // 목숨 줄어듦
+            aww.play();
+
+            // 하트 업데이트
+            heartsContainer.innerHTML = "❤️".repeat(lives); // 남은 목숨에 따라 하트 표시
+            heartsContainer.classList.add("blinkHeart"); // 깜빡이는 클래스 추가
+
+            // 2초 후에 깜빡임 효과 제거
+            setTimeout(() => {
+                heartsContainer.classList.remove("blinkHeart"); // 깜빡임 클래스 제거
+            }, 2000);
+          }
+
+          if (lives <= 0) {
+              messageButton.textContent = "새로고침을 눌러 재도전";
+              messageButton.style.color = "white";
+              messageButton.style.backgroundColor = "#3b3b3b";
+              messageButton.disabled = true; // 버튼 비활성화
+              cups.forEach(cup => cup.onclick = null); // 클릭 비활성화
+          }
+
+          displayRankings();  // 게임 결과 후 순위 표시 업데이트
+        };
+      });
+    }
+
+    // 게임 시작 호출
+    startGame();
+
+
+
+    // 점수 업데이트 함수
+    async function updateScore(change) {
+      const docRef = doc(db, "players", nickname);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const currentScore = docSnap.data().score || 0;
+        const newScore = currentScore + change;
+        await setDoc(docRef, { score: newScore });
+      }
+    }
+
+
+
+    // 순위를 Firestore에서 불러와 배경에 표시
+    async function displayRankings() {
+      const querySnapshot = await getDocs(collection(db, "players"));
+      const players = [];
+
+      querySnapshot.forEach((doc) => {
+        players.push({ nickname: doc.id, score: doc.data().score });
+      });
+
+      // 점수 내림차순 정렬
+      players.sort((a, b) => b.score - a.score);
+
+      const rankList = document.querySelector(".rank-list");
+      rankList.innerHTML = "";  // 기존 내용 초기화
+
+      const fixedFontSizes = [7, 6, 5, 4, 3]; // 1~5위 고정 폰트 크기 (vw)
+      const minDynamicFontSize = 0.5;  // 마지막 순위 폰트 크기 (vw)
+      const maxDynamicFontSize = 2;    // 6위 시작 폰트 크기 (vw)
+      const dynamicRanks = players.length - 5; // 6위부터 마지막 순위까지 개수
+      const fontStep = 
+        dynamicRanks > 1 ? (maxDynamicFontSize - minDynamicFontSize) / (dynamicRanks - 1) : 0;
+
+      players.forEach((player, index) => {
+        const span = document.createElement("span");
+        span.textContent = `#${index + 1} ${player.nickname} ${player.score}점`;
+
+        let fontSize;
+
+        if (index < 5) {
+          // 1~5위는 고정된 폰트 크기 사용
+          fontSize = fixedFontSizes[index];
+        } else {
+          // 6위부터 점진적으로 줄어드는 폰트 크기 계산
+          const dynamicIndex = index - 5;
+          fontSize = maxDynamicFontSize - fontStep * dynamicIndex;
+        }
+
+        span.style.fontSize = `${fontSize}vw`;
+
+        // 순위에 따른 투명도 설정
+        const opacity = index === players.length - 1 ? 0.001 : 1 - (index / players.length) * (1 - 0.001);
+        span.style.opacity = opacity;
+
+        // 모든 플레이어 닉네임 색상 흰색
+        span.style.color = "#e2e2e2";
+        
+        // 내 닉네임 처리
+        if (player.nickname === nickname) {
+        span.style.opacity = "1"; // 항상 투명도 100%
+        span.classList.add("blink"); // 깜빡이는 클래스 추가
+
+        // 색상 조절
+        let color;
+        if (index >= 6) { // 꼴등부터 6위까지
+          color = 'hsl(57, 100%, 78%)'; 
+        } else {
+          // 5위부터 HSL lightness 값이 5%씩 내려감
+          const lightnessDecrease = 5 * (-(index-6)); // 5위부터의 인덱스에 따라 명도 감소
+          console.log(lightnessDecrease);
+          const hslLightness = Math.min(78 - lightnessDecrease, 50); // 최대 50%로 제한
+          color = `hsl(57, 100%, ${hslLightness}%)`; // HSL 색상 조절
+        }
+
+          span.style.color = color;
+
+          // 1등일 때 오디오 재생
+          if (index === 0) {
+            clap.play(); 
+            explodeThumbsUp();
+          }
+        }
+
+        rankList.appendChild(span);
+      });
+    }
+
+
+
+
+    window.onload = async () => {
+      await getNickname();  // 닉네임 입력받기
+      startGame();  // 게임 시작
+    };
+
+    function explodeThumbsUp() {
+                const thumbsUp = document.getElementById('thumbsUp');
+                const numberOfThumbs = 30; // 흩뿌릴 thumbs up 이미지 수
+
+                for (let i = 0; i < numberOfThumbs; i++) {
+                    const newThumb = thumbsUp.cloneNode(); // 기존 이미지를 복제
+                    document.body.appendChild(newThumb); // 복제된 이미지를 body에 추가
+
+                    const randomSize = Math.floor(Math.random() *20) + 1; // 20 ~ 100px 사이의 크기
+                    newThumb.style.height = `${randomSize}vh`;
+
+                    newThumb.style.position = 'absolute'; // z-index가 작동하도록 position 설정
+                    newThumb.style.zIndex = 1; // z-index 설정
+        
+
+                    // 랜덤 위치 설정
+                    newThumb.style.left = Math.random() * window.innerWidth + 'px';
+                    newThumb.style.top = Math.random() * window.innerHeight + 'px';
+                    newThumb.style.display = 'block'; // 이미지 표시
+
+                    // setTimeout을 사용하여 애니메이션 적용에 약간의 지연 추가
+                    setTimeout(() => {
+                        // 애니메이션 스타일 설정
+                        newThumb.style.transition = 'transform 4s ease'; /*, opacity 3s ease*/
+                        newThumb.style.transform = `translateY(-120px)`;
+                        /*newThumb.style.opacity = 0; // 애니메이션 후 투명하게 설정*/
+                    }, 200);
+
+                    // 애니메이션 종료 후 이미지 제거
+                    setTimeout(() => {
+                        newThumb.remove();
+                    }, 1200);
+                }
+            }
+  </script>
+</head>
+
+
+<body>
+  <div id="levelDisplay" style="position: absolute; top: 1vw; left: 1vw; font-size: 5vh; color: white; font-weight: bold;">
+  Level 1
+</div>
+  <div class="hearts">
+    ❤️❤️❤️
+  </div>
+  <h1 style="z-index: -1; font-size: 7vw; margin: 0; position:relative; font-family: 'ghanachoco'; color: black;">Cups & Cats</h1>
+  <button id="message" style="animation: bounce 2s infinite; z-index: 1; font-size: 1vw;  font-weight: bold; border-radius: 100%;  width: auto; padding: 0.5vw; text-align: center;">&nbsp;&nbsp;고양이는 어느 컵에?&nbsp;&nbsp;</button>
+
+  <div class="rank-list"></div>  <!-- 배경 순위 표시 -->
+
+
+    <div>
+      <div class="cup" style="display: none;"></div>
+      <div class="cup" style="display: none;"></div>
+      <div class="cup" style="display: none;"></div> 
+    </div>
+    <img class="cat" src="cat-kitty.gif" id="lying" style="display:none"></img>
+
+  </div>
+
+  <img src="thumbsup.png" id="thumbsUp" style="display:none"></img>
+  <audio id="aww" src="aww.mp3"></audio>
+  <audio id="swoosh" src="swoosh.mp3"></audio>
+  <audio id="button" src="button.mp3"></audio>
+  <audio id="clap" src="clap.mp3"></audio>
+  <audio id="meow1" src="meow1.mp3"></audio>
+  <audio id="meow2" src="meow2.mp3"></audio>
+  <audio id="meow3" src="meow3.mp3"></audio>
+  <audio id="meow4" src="meow4.mp3"></audio>
+  <audio id="meow5" src="meow5.mp3"></audio>
+  <audio id="meow6" src="meow6.mp3"></audio>
+</body>
+</html>
